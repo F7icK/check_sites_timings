@@ -1,0 +1,3 @@
+postgres_dsn: "host=localhost port=5432 user=user password=password dbname=dbname sslmode=disable"
+
+server_port: ":8080"
