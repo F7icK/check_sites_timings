@@ -1,46 +1,34 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"log"
-	"net/http"
+	"flag"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/F7icK/check_sites_timings/internal/check_sites_timings/server"
-	"github.com/F7icK/check_sites_timings/internal/check_sites_timings/server/handlers"
-	"github.com/F7icK/check_sites_timings/internal/check_sites_timings/service"
+	"github.com/F7icK/check_sites_timings/internal/application"
+	"github.com/F7icK/check_sites_timings/internal/check_sites_timings/types/config"
+	"github.com/F7icK/check_sites_timings/pkg/customlog"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	services := service.NewService()
+	configPath := new(string)
 
-	endpoints := handlers.NewHandlers(services)
+	flag.StringVar(configPath, "config-path", "./config/config.yaml", "specify path to yaml")
+	flag.Parse()
 
-	srv := server.NewServer(endpoints)
+	customlog.Init()
 
-	stopFunc := func() {
-		if err := srv.Shutdown(context.Background()); err != nil {
-			log.Printf("err with Shutdown in main :%s", err.Error())
-		}
+	configFile, err := os.Open(*configPath)
+	if err != nil {
+		customlog.Error.Println(err)
+		return
 	}
 
-	signalCh := make(chan os.Signal)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
-	defer close(signalCh)
-
-	go func(signalCh <-chan os.Signal, stopFunc func()) {
-		select {
-		case sig := <-signalCh:
-			log.Printf("stopped with signal: %s", sig)
-			stopFunc()
-			os.Exit(0)
-		}
-	}(signalCh, stopFunc)
-
-	if err := srv.Run(); !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("err with Run in main :%s", err.Error())
+	cfg := config.Config{}
+	if err = yaml.NewDecoder(configFile).Decode(&cfg); err != nil {
+		customlog.Error.Println(err)
+		return
 	}
+
+	application.NewApplication(&cfg)
 }
